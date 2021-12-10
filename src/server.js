@@ -12,6 +12,9 @@ require("dotenv").config();
 const cors = require("cors");
 app.use(cors());
 
+//=====redis=====
+const redis = require('redis');
+
 //COSTANTS
 const PORT = process.env.SERVER_PORT;
 
@@ -35,6 +38,17 @@ async function startServer() {
         res.json({ serverstatus: "ok" });
     });
 
+    app.get("/register", (req, res) => {
+        const account = req.params;
+        console.log(account);
+        if (!account.name || !account.email || !account.password) {
+            res.status(400);
+            res.send("non sono stati inviati tutti i campi della registrazione");
+        }
+
+        res.send("bene");
+    });
+
     //=========Running this function everyday at 23:59=========
     cron.schedule("59 23 * * *", () => {
         console.log("---------------------");
@@ -42,6 +56,14 @@ async function startServer() {
         console.log("---------------------");
     });
 
+    //==========redisclient===================
+
+    const client = redis.createClient();
+    client.on('error', (err) => console.log('Redis Client Error', err));
+    await client.connect();
+
+
+    //============listening to port================
     app.listen(PORT, () => {
         console.log(
             chalk.bgGreen.black(
