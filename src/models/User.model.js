@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const UserSchema = new mongoose.Schema({
-    name: {
+    nome: {
         type: String,
         required: true,
         index: true
@@ -15,6 +15,8 @@ const UserSchema = new mongoose.Schema({
         required: true,
         index: true
     },
+    cartella: [{ type: Number, required: false }],
+    numeri_usciti: [{ type: Number, required: false }]
 });
 
 const User = mongoose.model("user", UserSchema);

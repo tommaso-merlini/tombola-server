@@ -5,19 +5,16 @@ const cron = require("node-cron");
 const express = require("express");
 const app = express();
 const rateLimit = require("express-rate-limit");
-const http = require('http').Server(app);
-const io = require('socket.io')(http, {
-    maxHttpBufferSize: 100000000,
-    connectTimeout: 5000,
-    transports: ['websocket'],
-    pingInterval: 25 * 1000,
-    pingTimeout: 5000,
-    allowEIO3: true,
+const http = require('http').createServer(app);
+const io = require("socket.io")(http, {
     cors: {
-        origin: ["http://localhost:5000", 'https://admin.socket.io'],
-        methods: ["GET", "POST"],
+        origin: "*",
+        methods: ["GET", "POST"]
     }
 });
+
+
+
 const bcrypt = require('bcrypt');
 const { instrument } = require('@socket.io/admin-ui');
 const mongoose = require("mongoose");
@@ -29,7 +26,7 @@ const User = require("./models/User.model.js");
 const chalk = require("chalk"); //console.log colors
 require("dotenv").config();
 const cors = require("cors");
-app.use(cors());
+//app.use(cors());
 
 
 //COSTANTS
@@ -47,10 +44,15 @@ const limiter = rateLimit({
 //  apply to all requests
 app.use(limiter);
 
-
 //!======server instance======
 
 async function startServer() {
+
+    //variables
+    const classifica = [];
+    const numer_usciti = [];
+    var numero_casuale;
+
     app.get("/", (req, res) => {
         res.json({ serverstatus: "ok" });
     });
@@ -58,7 +60,7 @@ async function startServer() {
     app.post("/register", express.json(), async (req, res) => {
         try {
             const account = req.body;
-            if (!account.name || !account.email || !account.password) {
+            if (!account.nome || !account.email || !account.password) {
                 res.status(400);
                 throw new Error("non sono stati inviati tutti i campi della registrazione");
             }
@@ -67,9 +69,11 @@ async function startServer() {
             console.log(hashedPassword);
 
             const user = new User({
-                name: account.name,
+                nome: account.nome,
                 email: account.email,
-                password: hashedPassword
+                password: hashedPassword,
+                cartella: [],
+                numeri_usciti: []
             });
             user.save();
 
@@ -92,14 +96,22 @@ async function startServer() {
         }
     });
 
-    instrument(io, { auth: false });
+    //instrument(io, { auth: false });
 
-    io.on('connection', function(socket) {
-        console.log('A user connected');
+    io.on('connection', (socket) => {
+        console.log('user connected');
+
+        socket.on("numero_uguale", async ({ id, nome, numero }) => {
+            const utente = await User.findById(id);
+            console.log(utente);
+            const numeri_uscitiUtente = utente.numeri_usciti;
+            console.log(numeri_uscitiUtente);
+            const utenteAggiornato = await User.updateOne({ _id: id }, { numeri_usciti: [...numeri_uscitiUtente, numero] })
+        });
 
         //Whenever someone disconnects this piece of code executed
         socket.on('disconnect', function() {
-            console.log('A user disconnected');
+            console.log('user disconnected');
         });
     });
 
@@ -122,15 +134,20 @@ async function startServer() {
         process.exit(0);
     });
 
-    //=========Running this function everyday at 23:59=========
-    cron.schedule("59 23 * * *", () => {
+    //=========nuovo numero ogni 10 secondi=========
+    cron.schedule("*/10 * * * * *", () => {
+        numero_casuale = Math.floor(Math.random() * (100 - 1 + 1)) + 1;
+
         console.log("---------------------");
-        console.log("Running Cron Job");
+        console.log(`numero uscito: ${numero_casuale}`);
         console.log("---------------------");
+
+        io.sockets.emit("nuovo_numero", numero_casuale);
+
     });
 
     //============listening to port================
-    app.listen(PORT, () => {
+    http.listen(PORT, () => {
         console.log(
             chalk.bgGreen.black(
                 `server ${process.pid} running on http://localhost:${PORT} :D`
