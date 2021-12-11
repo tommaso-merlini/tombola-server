@@ -16,17 +16,16 @@ const io = require("socket.io")(http, {
 
 
 const bcrypt = require('bcrypt');
-const { instrument } = require('@socket.io/admin-ui');
 const mongoose = require("mongoose");
 
 //=======models=========
-const User = require("./models/User.model.js");
+const User = require("./models/User.js");
 
 //=====misc=====
 const chalk = require("chalk"); //console.log colors
 require("dotenv").config();
 const cors = require("cors");
-//app.use(cors());
+app.use(cors());
 
 
 //COSTANTS
@@ -50,7 +49,7 @@ async function startServer() {
 
     //variables
     const classifica = [];
-    const numer_usciti = [];
+    const numeri_usciti = [];
     var numero_casuale;
 
     app.get("/", (req, res) => {
@@ -68,14 +67,14 @@ async function startServer() {
             hashedPassword = await bcrypt.hash(account.password, 2);
             console.log(hashedPassword);
 
-            const user = new User({
+            const user = await new User({
                 nome: account.nome,
                 email: account.email,
                 password: hashedPassword,
                 cartella: [],
                 numeri_usciti: []
             });
-            user.save();
+            await user.save();
 
             res.send("bene");
         } catch (e) {
@@ -107,6 +106,8 @@ async function startServer() {
             const numeri_uscitiUtente = utente.numeri_usciti;
             console.log(numeri_uscitiUtente);
             const utenteAggiornato = await User.updateOne({ _id: id }, { numeri_usciti: [...numeri_uscitiUtente, numero] })
+
+            //TODO: aggiornare la classifica
         });
 
         //Whenever someone disconnects this piece of code executed
@@ -135,8 +136,12 @@ async function startServer() {
     });
 
     //=========nuovo numero ogni 10 secondi=========
-    cron.schedule("*/10 * * * * *", () => {
+    cron.schedule("*/10 * * * * *", async () => {
         numero_casuale = Math.floor(Math.random() * (100 - 1 + 1)) + 1;
+
+        //aggiungere numeri usciti in un array e vedere se il numero non e' gia uscito
+        numeri_usciti.indexOf(numero_casuale) === -1 ? numeri_usciti.push(numero_casuale) : null;
+        console.log(numeri_usciti);
 
         console.log("---------------------");
         console.log(`numero uscito: ${numero_casuale}`);
