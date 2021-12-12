@@ -13,8 +13,6 @@ const io = require("socket.io")(http, {
     }
 });
 
-
-
 const bcrypt = require('bcrypt');
 const mongoose = require("mongoose");
 
