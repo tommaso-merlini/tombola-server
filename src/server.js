@@ -54,6 +54,8 @@ async function startServer() {
         res.json({ serverstatus: "ok" });
     });
 
+
+    //===========api===============
     app.post("/register", express.json(), async (req, res) => {
         try {
             const account = req.body;
@@ -93,6 +95,7 @@ async function startServer() {
         }
     });
 
+    //==================socket====================
     //instrument(io, { auth: false });
 
     io.on('connection', (socket) => {
