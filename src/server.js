@@ -18,6 +18,7 @@ const mongoose = require("mongoose");
 
 //=======models=========
 const User = require("./models/User.js");
+const Table = require("./models/Table.js");
 
 //=====misc=====
 const chalk = require("chalk"); //console.log colors
@@ -41,14 +42,55 @@ const limiter = rateLimit({
 //  apply to all requests
 app.use(limiter);
 
+
+
+
+
+
+
+
+
 //!======server instance======
 
 async function startServer() {
 
     //variables
     const classifica = [];
-    const numeri_usciti = [];
     var numero_casuale;
+    var numeri_usciti;
+    var tabellone;
+    const numeri_tabellone = 10;
+
+    //==========mongoose==============
+    mongoose
+        .connect(process.env.MONGO_ATLAS_URI, {
+            useUnifiedTopology: true,
+            useNewUrlParser: true,
+        })
+        .catch((err) => {
+            console.log(err.message);
+        });
+
+    mongoose.connection.on("error", (err) => {
+        console.log(err.message);
+    });
+
+    process.on("SIGINT", async () => {
+        await mongoose.connection.close();
+        process.exit(0);
+    });
+
+
+
+
+    const tabelloniCreati = await Table.find();
+    if (tabelloniCreati.length === 0) {
+        tabellone = await new Table({ numeri_usciti: [] })
+        tabellone = await tabellone.save();
+        console.log(tabellone);
+    } else {
+        tabellone = tabelloniCreati[0];
+    }
 
     app.get("/", (req, res) => {
         res.json({ serverstatus: "ok" });
@@ -117,39 +159,33 @@ async function startServer() {
         });
     });
 
-    //==========mongoose==============
-    mongoose
-        .connect(process.env.MONGO_ATLAS_URI, {
-            useUnifiedTopology: true,
-            useNewUrlParser: true,
-        })
-        .catch((err) => {
-            console.log(err.message);
-        });
 
-    mongoose.connection.on("error", (err) => {
-        console.log(err.message);
-    });
-
-    process.on("SIGINT", async () => {
-        await mongoose.connection.close();
-        process.exit(0);
-    });
 
     //=========nuovo numero ogni 10 secondi=========
-    cron.schedule("*/10 * * * * *", async () => {
-        numero_casuale = Math.floor(Math.random() * (100 - 1 + 1)) + 1;
+    cron.schedule("*/2 * * * * *", async () => {
+        numero_casuale = Math.floor(Math.random() * (numeri_tabellone - 1 + 1)) + 1;
+
+        tabellone = await Table.findById(tabellone._id);
+        numeri_usciti = tabellone.numeri_usciti;
+        console.log("---------------------");
+        console.log(`numeri usciti: ${numeri_usciti}`);
+        console.log("---------------------");
+
+        if (numeri_usciti.length === numeri_tabellone) {
+            console.log("numeri finiti");
+            io.sockets.emit("numeri_finiti", true);
+        }
 
         //aggiungere numeri usciti in un array e vedere se il numero non e' gia uscito
-        numeri_usciti.indexOf(numero_casuale) === -1 ? numeri_usciti.push(numero_casuale) : null;
-        console.log(numeri_usciti);
-
-        console.log("---------------------");
-        console.log(`numero uscito: ${numero_casuale}`);
-        console.log("---------------------");
-
-        io.sockets.emit("nuovo_numero", numero_casuale);
-
+        if (numeri_usciti.indexOf(numero_casuale) === -1) {
+            await Table.updateOne({ _id: tabellone._id }, { numeri_usciti: [...numeri_usciti, numero_casuale] });
+            console.log("---------------------");
+            console.log(`numero uscito: ${numero_casuale}`);
+            console.log("---------------------");
+            io.sockets.emit("nuovo_numero", numero_casuale);
+        } else {
+            console.log("numero uguale");
+        }
     });
 
     //============listening to port================
