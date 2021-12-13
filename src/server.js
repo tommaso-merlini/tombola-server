@@ -174,18 +174,20 @@ async function startServer() {
         if (numeri_usciti.length === numeri_tabellone) {
             console.log("numeri finiti");
             io.sockets.emit("numeri_finiti", true);
-        }
+        } else {
+            //aggiungere numeri usciti in un array e vedere se il numero non e' gia uscito
+            while (numeri_usciti.includes(numero_casuale)) {
+                console.log("riprova");
+                numero_casuale = Math.floor(Math.random() * (numeri_tabellone - 1 + 1)) + 1;
+            }
 
-        //aggiungere numeri usciti in un array e vedere se il numero non e' gia uscito
-        if (numeri_usciti.indexOf(numero_casuale) === -1) {
             await Table.updateOne({ _id: tabellone._id }, { numeri_usciti: [...numeri_usciti, numero_casuale] });
             console.log("---------------------");
             console.log(`numero uscito: ${numero_casuale}`);
             console.log("---------------------");
             io.sockets.emit("nuovo_numero", numero_casuale);
-        } else {
-            console.log("numero uguale");
         }
+
     });
 
     //============listening to port================
